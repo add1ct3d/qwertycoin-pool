@@ -795,7 +795,7 @@ response_to_block_template(json_object *result,
             json_object_get_string(blocktemplate_blob));
     block_template->difficulty = json_object_get_int64(difficulty);
     block_template->height = json_object_get_int64(height);
-    memcpy(block_template->prev_hash, json_object_get_string(prev_hash), 64);
+    //memcpy(block_template->prev_hash, json_object_get_string(prev_hash), 64);
     block_template->reserved_offset = json_object_get_int(reserved_offset);
 
     unsigned int major_version = 0;
@@ -1147,13 +1147,13 @@ rpc_on_last_block_header(const char* data, rpc_callback_t *callback)
         rpc_callback_t *cb1 = rpc_callback_new(rpc_on_block_template, NULL);
         rpc_request(base, body, cb1);
 
-        uint64_t end = front->height - 60;
+/*        uint64_t end = front->height - 60;
         uint64_t start = end - BLOCK_HEADERS_RANGE + 1;
         rpc_get_request_body(body, "getblockheadersrange", "sdsd",
                 "start_height", start, "end_height", end);
         rpc_callback_t *cb2 = rpc_callback_new(
                 rpc_on_block_headers_range, NULL);
-        rpc_request(base, body, cb2);
+        rpc_request(base, body, cb2);*/
     }
 
     json_object_put(root);

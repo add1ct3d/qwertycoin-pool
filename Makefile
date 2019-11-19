@@ -28,7 +28,7 @@
 #  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 #  POSSIBILITY OF SUCH DAMAGE.
 
-TARGET = xmc-pool
+TARGET = qwc-pool
 
 TYPE = debug
 
@@ -166,7 +166,6 @@ $(TARGET): preflight dirs $(OBJECTS) $(COBJECTS) $(SOBJECTS) $(HTMLOBJECTS)
 	  $(foreach LIB,$(LIBPATH),-L$(LIB)) \
 	  $(PKG_LIBS) $(STATIC_LIBS)
 	@cp pool.conf $(STORE)/
-	@cp tools/* $(STORE)/
 
 $(STORE)/%.o: %.cpp
 	@echo Creating object file for $*...
