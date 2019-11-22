@@ -78,11 +78,9 @@ developers.
 #define CLIENT_JOBS_MAX 4
 #define BLOCK_HEADERS_MAX 4
 #define BLOCK_TEMPLATES_MAX 4
-#define MAINNET_ADDRESS_PREFIX 18
+#define MAINNET_ADDRESS_PREFIX 1344012
 #define TESTNET_ADDRESS_PREFIX 53
 #define BLOCK_HEADERS_RANGE 10
-#define DB_SIZE 0x140000000 /* 5G */
-#define DB_COUNT_MAX 10
 #define MAX_PATH 1024
 #define RPC_PATH "/json_rpc"
 #define ADDRESS_MAX 128
@@ -288,8 +286,8 @@ rpc_callback_free(rpc_callback_t *callback)
 static int
 store_share(uint64_t height, share_t *share)
 {
-		uint64_t timestamp = share->timestamp;
-		add_share_to_db(share->height, share->difficulty, share->address, timestamp);
+	uint64_t timestamp = share->timestamp;
+	add_share_to_db(share->height, share->difficulty, share->address, timestamp);
     return 0;
 }
 
@@ -297,7 +295,7 @@ static int
 store_block(uint64_t height, block_t *block)
 {
     uint64_t timestamp = block->timestamp;
-		add_block_to_db(block->height, block->hash, block->prev_hash, block->difficulty, block->status, block->reward, timestamp);
+	add_block_to_db(block->height, block->hash, block->prev_hash, block->difficulty, block->status, block->reward, timestamp);
     return 0;
 }
 
@@ -326,7 +324,7 @@ miner_hr(const char *address)
 static void
 update_pool_hr(void)
 {
-    log_trace("update pool hash rate");
+    //log_trace("update pool hash rate");
     uint64_t hr = 0;
     client_t *c = pool_clients.clients;
     for (size_t i = 0; i < pool_clients.count; i++, c++)
@@ -364,7 +362,7 @@ static void
 retarget(client_t *client, job_t *job)
 {
     double duration = difftime(time(NULL), client->connected_since);
-    uint8_t retarget_time = 5; //client->is_proxy ? 5 : 120;
+    uint8_t retarget_time = client->is_proxy ? 5 : 120;
     uint64_t target = fmax((double)client->hashes /
             duration * retarget_time, config.pool_start_diff);
     job->target = target;
@@ -433,7 +431,7 @@ stratum_get_proxy_job_body(char *body, const client_t *client,
     }
     else
     {
-				log_info("stratum get proxy job body response false" );
+		log_info("stratum get proxy job body response false" );
         snprintf(body, JOB_BODY_MAX, "{\"jsonrpc\":\"2.0\",\"method\":"
                 "\"job\",\"params\""
                 ":{\"id\":\"%.32s\",\"job\":{\"blocktemplate_blob\":\"%s\","
@@ -683,10 +681,10 @@ client_send_job(client_t *client, bool response)
 //    size_t bin_size = strlen(bt->blocktemplate_blob) >> 1;
 //    unsigned char *block = calloc(bin_size, sizeof(char));
 //    hex_to_bin(bt->blocktemplate_blob, bin_size << 1, block, bin_size);
-			size_t hex_size = strlen(bt->blocktemplate_blob);
-			size_t bin_size = hex_size >> 1;
-      unsigned char *block = calloc(bin_size, sizeof(char));
-			hex_to_bin(bt->blocktemplate_blob, hex_size, block, bin_size);
+	size_t hex_size = strlen(bt->blocktemplate_blob);
+	size_t bin_size = hex_size >> 1;
+    unsigned char *block = calloc(bin_size, sizeof(char));
+	hex_to_bin(bt->blocktemplate_blob, hex_size, block, bin_size);
 
 
     /* Set the extra nonce in our reserved space */
@@ -723,7 +721,7 @@ client_send_job(client_t *client, bool response)
 
     /* Retarget */
     retarget(client, job);
-		log_info("retarget");
+	log_info("retarget");
 
     char body[JOB_BODY_MAX];
     if (!client->is_proxy)
@@ -1030,7 +1028,7 @@ rpc_on_block_headers_range(const char* data, rpc_callback_t *callback)
 static void
 rpc_on_block_template(const char* data, rpc_callback_t *callback)
 {
-    log_trace("Got block template: \n%s", data);
+    //log_trace("Got block template: \n%s", data);
     json_object *root = json_tokener_parse(data);
     JSON_GET_OR_WARN(result, root, json_type_object);
     JSON_GET_OR_WARN(status, result, json_type_string);
@@ -1089,7 +1087,7 @@ rpc_on_view_key(const char* data, rpc_callback_t *callback)
 static void
 rpc_on_last_block_header(const char* data, rpc_callback_t *callback)
 {
-    log_trace("Got last block header: \n%s", data);
+    //log_trace("Got last block header: \n%s", data);
     json_object *root = json_tokener_parse(data);
     JSON_GET_OR_WARN(result, root, json_type_object);
     JSON_GET_OR_WARN(status, result, json_type_string);
@@ -1226,7 +1224,8 @@ timer_on_120s(int fd, short kind, void *ctx)
 static void
 timer_on_1m(int fd, short kind, void *ctx)
 {
-		batch_sql();	
+    log_info("flush data to db");
+	batch_sql();	
     struct timeval timeout = { .tv_sec = 60, .tv_usec = 0 };
     evtimer_add(timer_1m, &timeout);
 }
@@ -1324,6 +1323,7 @@ client_on_login(json_object *message, client_t *client)
     const char *address = json_object_get_string(login);
     uint64_t prefix;
     parse_address(address, &prefix, NULL);
+    
     if (prefix != MAINNET_ADDRESS_PREFIX && prefix != TESTNET_ADDRESS_PREFIX)
     {
         send_validation_error(client,
