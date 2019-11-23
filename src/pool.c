@@ -334,6 +334,8 @@ update_pool_hr(void)
             double d = difftime(time(NULL), c->connected_since);
             if (d == 0.0)
                 continue;
+            //log_info("client hash %"PRIu64, c->hashes);
+
             hr += c->hashes / d;
         }
     }
@@ -362,10 +364,14 @@ static void
 retarget(client_t *client, job_t *job)
 {
     double duration = difftime(time(NULL), client->connected_since);
+    duration = client->is_proxy ? (duration/2) : duration; 
     uint8_t retarget_time = client->is_proxy ? 5 : 120;
     uint64_t target = fmax((double)client->hashes /
             duration * retarget_time, config.pool_start_diff);
     job->target = target;
+    log_debug("client duraion %f ", duration);
+    log_debug("client retarget_time %"PRIu64, retarget_time);
+    log_debug("client hash %"PRIu64, client->hashes);
     log_debug("Client %.32s target now %"PRIu64, client->client_id, target);
 }
 
@@ -737,7 +743,7 @@ client_send_job(client_t *client, bool response)
        // stratum_get_proxy_job_body(body, client, block_hex, response);
        // free(block_hex);
     }
-    log_trace("Client job: %s", body);
+    //log_trace("Client job: %s", body);
     struct evbuffer *output = bufferevent_get_output(client->bev);
     evbuffer_add(output, body, strlen(body));
     free(block);
@@ -952,7 +958,7 @@ rpc_get_request_body(char *body, const char *method, char *fmt, ...)
     }
     *pb++ = '}';
     *pb = '\0';
-    log_trace("Payload: %s", body);
+    //log_trace("Payload: %s", body);
 }
 
 static void
@@ -1205,7 +1211,7 @@ fetch_view_key(void)
 static void
 fetch_last_block_header(void)
 {
-    log_info("Fetching last block header");
+//    log_info("Fetching last block header");
     char body[RPC_BODY_MAX];
     rpc_get_request_body(body, "getlastblockheader", NULL);
     rpc_callback_t *cb = rpc_callback_new(rpc_on_last_block_header, NULL);
@@ -1215,7 +1221,7 @@ fetch_last_block_header(void)
 static void
 timer_on_120s(int fd, short kind, void *ctx)
 {
-    log_trace("Fetching last block header from timer");
+   // log_trace("Fetching last block header from timer");
     fetch_last_block_header();
     struct timeval timeout = { .tv_sec = 10, .tv_usec = 0 };
     evtimer_add(timer_120s, &timeout);
@@ -1224,7 +1230,7 @@ timer_on_120s(int fd, short kind, void *ctx)
 static void
 timer_on_1m(int fd, short kind, void *ctx)
 {
-    log_info("flush data to db");
+    //log_info("flush data to db");
 	batch_sql();	
     struct timeval timeout = { .tv_sec = 60, .tv_usec = 0 };
     evtimer_add(timer_1m, &timeout);
@@ -1323,14 +1329,6 @@ client_on_login(json_object *message, client_t *client)
     const char *address = json_object_get_string(login);
     uint64_t prefix;
     parse_address(address, &prefix, NULL);
-    
-    if (prefix != MAINNET_ADDRESS_PREFIX && prefix != TESTNET_ADDRESS_PREFIX)
-    {
-        send_validation_error(client,
-                "login only main wallet addresses are supported");
-        return;
-    }
-
     const char *worker_id = json_object_get_string(pass);
 
     json_object *agent = NULL;
@@ -1345,6 +1343,17 @@ client_on_login(json_object *message, client_t *client)
         }
     }
 
+    if (!client->is_proxy) 
+    {
+        if (prefix != MAINNET_ADDRESS_PREFIX && prefix != TESTNET_ADDRESS_PREFIX)
+        {
+            send_validation_error(client,
+                    "login only main wallet addresses are supported");
+            return;
+        }
+
+    }
+  
     if (client->is_proxy && client->mode == MODE_SELF_SELECT)
     {
         send_validation_error(client,
@@ -1561,8 +1570,9 @@ client_on_submit(json_object *message, client_t *client)
     *psub++ = worker_nonce;
 
     psub -= 4;
-    log_trace("Submission reserved values: %u %u %u %u",
+    /*log_trace("Submission reserved values: %u %u %u %u",
             *psub, *(psub+1), *(psub+2), *(psub+3));
+    */
 
     /* Check not already submitted */
     uint128_t *submissions = job->submissions;
@@ -1647,9 +1657,10 @@ client_on_submit(json_object *message, client_t *client)
     client->hashes += job->target;
     time_t now = time(NULL);
     bool can_store = true;
-    log_trace("Checking hash against blobk difficulty: "
+    /*log_trace("Checking hash against blobk difficulty: "
             "%lu, job difficulty: %lu",
             BN_get_word(bd), BN_get_word(jd));
+    */
 
     if (BN_cmp(hd, bd) >= 0)
     {
